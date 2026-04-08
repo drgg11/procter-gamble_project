@@ -1,60 +1,75 @@
-import pyodbc
 import tkinter as tk
 from tkinter import ttk, messagebox
+from connectdb import engine, get_session
+from sqlalchemy import text
 
 # Database connection and query classes
 class DatabaseConnection:
-    def __init__(self, connection_string):
-        self.connection_string = connection_string
-        self.connection = None
+    def __init__(self):
+        self.engine = engine
+        self.connection = engine
 
     def connect(self):
         try:
-            self.connection = pyodbc.connect(self.connection_string)
-            print("Connection successful!")
-        except pyodbc.Error as ex:
+            with self.engine.connect() as conn:
+                print("Connection successful!")
+        except Exception as ex:
             print(f"Error: {ex}")
-            self.connection = None
 
     def close(self):
-        if self.connection:
-            self.connection.close()
+        pass
 
 class DataQuery:
     def __init__(self, db_connection):
-        self.db_connection = db_connection
+        self.engine = db_connection.engine
 
     def fetch_all(self, table_name):
-        cursor = self.db_connection.connection.cursor()
-        cursor.execute(f"SELECT * FROM {table_name}")
-        return cursor.fetchall()
+        try:
+            session = get_session()
+            query = f"SELECT * FROM {table_name}"
+            result = session.execute(text(query))
+            data = result.fetchall()
+            session.close()
+            return data
+        except Exception as e:
+            print(f"Error fetching {table_name}: {e}")
+            return []
 
     def insert_identifier(self, identifier_name, description, identifier_type):
-        cursor = self.db_connection.connection.cursor()
-        cursor.execute("""
-            INSERT INTO Identifiers (identifier_name, description, identifier_type)
-            VALUES (?, ?, ?)
-        """, (identifier_name, description, identifier_type))
-        self.db_connection.connection.commit()
+        try:
+            session = get_session()
+            desc_esc = description.replace("'", "''") if description else ""
+            query = f"INSERT INTO Identifiers (identifier_name, description, identifier_type) VALUES ('{identifier_name}', '{desc_esc}', '{identifier_type}')"
+            session.execute(text(query))
+            session.commit()
+            session.close()
+        except Exception as e:
+            print(f"Error inserting identifier: {e}")
 
     def delete_dependencies(self, table_name, identifier_column, identifier_value):
-        cursor = self.db_connection.connection.cursor()
-
-        if table_name == "Identifiers":
-            cursor.execute("DELETE FROM Ownership WHERE identifier_name = ?", (identifier_value,))
-            cursor.execute("DELETE FROM Relationships WHERE from_identifier_name = ? OR to_identifier_name = ?", (identifier_value, identifier_value))
-            cursor.execute("DELETE FROM IdentifierCharacteristics WHERE identifier_name = ?", (identifier_value,))
-
-        if table_name == "Countries":
-            cursor.execute("DELETE FROM ConsumerUnits WHERE country_name = ?", (identifier_value,))
-
-        self.db_connection.connection.commit()
+        try:
+            session = get_session()
+            if table_name == "Identifiers":
+                session.execute(text(f"DELETE FROM Ownership WHERE identifier_name = '{identifier_value}'"))
+                session.execute(text(f"DELETE FROM Relationships WHERE from_identifier_name = '{identifier_value}' OR to_identifier_name = '{identifier_value}'"))
+                session.execute(text(f"DELETE FROM IdentifierCharacteristics WHERE identifier_name = '{identifier_value}'"))
+            if table_name == "Countries":
+                session.execute(text(f"DELETE FROM ConsumerUnits WHERE country_name = '{identifier_value}'"))
+            session.commit()
+            session.close()
+        except Exception as e:
+            print(f"Error deleting dependencies: {e}")
 
     def delete_entry(self, table_name, identifier_column, identifier_value):
         self.delete_dependencies(table_name, identifier_column, identifier_value)
-        cursor = self.db_connection.connection.cursor()
-        cursor.execute(f"DELETE FROM {table_name} WHERE {identifier_column} = ?", (identifier_value,))
-        self.db_connection.connection.commit()
+        try:
+            session = get_session()
+            query = f"DELETE FROM {table_name} WHERE {identifier_column} = '{identifier_value}'"
+            session.execute(text(query))
+            session.commit()
+            session.close()
+        except Exception as e:
+            print(f"Error deleting entry: {e}")
 
 # Tkinter application class
 class Application:
@@ -72,7 +87,6 @@ class Application:
         self.create_generic_tab("Ownership", ["Identifier Name", "Originator First Name", "User ID"], "identifier_name")
         self.create_generic_tab("Relationships", ["From Identifier", "To Identifier", "Relationship"], "from_identifier_name")
         self.create_generic_tab("Characteristics", ["Master Name", "Name", "Specifics"], "master_name")
-        self.create_generic_tab("IdentifierCharacteristics", ["Identifier Name", "Master Name", "Characteristic Name"], "identifier_name")
 
     def create_identifiers_tab(self):
         frame = ttk.Frame(self.notebook)
@@ -134,10 +148,13 @@ class Application:
             tree.heading(col, text=col)
         tree.pack(expand=True, fill='both')
 
-        data_query = DataQuery(self.db_connection)
-        data = data_query.fetch_all(table_name)
-        for row in data:
-            tree.insert("", tk.END, values=[str(item) for item in row])
+        try:
+            data_query = DataQuery(self.db_connection)
+            data = data_query.fetch_all(table_name)
+            for row in data:
+                tree.insert("", tk.END, values=[str(item) for item in row])
+        except Exception as e:
+            tree.insert("", tk.END, values=[f"Error loading table: {str(e)[:50]}"])
 
         ttk.Button(frame, text="Delete Selected", command=lambda: self.delete_entry(tree, table_name, identifier_column)).pack(pady=5)
 
@@ -155,18 +172,12 @@ class Application:
 
 # Main function to run the application
 def run_app():
-    connection_string = (
-        "Driver={ODBC Driver 17 for SQL Server};"
-        "Server=(localdb)\\localhost;"
-        "Database=Dummy;"
-        "Trusted_Connection=yes;"
-    )
-
-    db_connection = DatabaseConnection(connection_string)
+    db_connection = DatabaseConnection()
     db_connection.connect()
 
     root = tk.Tk()
     root.title("Database Viewer")
+    root.geometry("800x600")
     app = Application(root, db_connection)
     root.mainloop()
 

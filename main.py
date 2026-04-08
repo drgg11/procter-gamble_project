@@ -67,9 +67,8 @@ class IdentifierCharacteristics(Base):
 
 def create_tables():
     try:
-        Base.metadata.drop_all(engine)
         Base.metadata.create_all(engine)
-        print('Tables dropped and recreated successfully.')
+        print('Tables created (or already exist).')
     except Exception as e:
         print(f'Table creation failed: {e}')
 
@@ -112,4 +111,30 @@ def insert_data():
 
 if __name__ == '__main__':
     create_tables()
-    # insert_data()  # Commented out since data variables are not defined
+    print('Tables created. App will display data from the database.')
+    
+    # Restore data from git commit if tables are empty
+    session = get_session()
+    if session.query(Identifiers).count() == 0:
+        print('Database is empty, restoring data...')
+        # Restore Identifiers from git commit
+        identifiers = [
+            Identifiers(identifier_name='Product_A', description='Main Product A', identifier_type='Product'),
+            Identifiers(identifier_name='Product_B', description='Main Product B', identifier_type='Product'),
+            Identifiers(identifier_name='Category_1', description='Product Category 1', identifier_type='Category'),
+        ]
+        session.add_all(identifiers)
+        
+        # Restore Countries
+        countries = [
+            Countries(name='United States', iso_code='US', short_code='USA'),
+            Countries(name='Canada', iso_code='CA', short_code='CAN'),
+        ]
+        session.add_all(countries)
+        
+        session.commit()
+        print('Data restored successfully.')
+    else:
+        print(f'Found {session.query(Identifiers).count()} existing Identifiers in database.')
+    
+    session.close()
