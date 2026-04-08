@@ -1,18 +1,20 @@
+import pyodbc
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+
 connection_string = (
-    r'Driver={SQL Server};'
-    r'Server=DESKTOP-EIE92NK;'
-    r'Database=database;'
+    r'Driver={ODBC Driver 18 for SQL Server};'
+    r'Server=DESKTOP-8OEIM3E;'
+    r'Database=project_pg;'
     r'Trusted_Connection=yes;'
+    r'TrustServerCertificate=yes;'
 )
 
 engine = create_engine(f'mssql+pyodbc:///?odbc_connect={connection_string}', echo=False)
 Session = sessionmaker(bind=engine)
 
 def get_session():
-    return Session()
+    return Session()    
 
-# For backward compatibility, keep conn as engine
 conn = engine

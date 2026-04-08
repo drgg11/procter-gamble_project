@@ -2,6 +2,7 @@ from sqlalchemy import Column, String, Text, Integer, DECIMAL, ForeignKey
 from sqlalchemy.orm import declarative_base, relationship
 from connectdb import engine, get_session
 
+
 Base = declarative_base()
 
 class Identifiers(Base):
@@ -66,10 +67,11 @@ class IdentifierCharacteristics(Base):
 
 def create_tables():
     try:
+        Base.metadata.drop_all(engine)
         Base.metadata.create_all(engine)
-        print('Tables created successfully.')
+        print('Tables dropped and recreated successfully.')
     except Exception as e:
-        print(f'Table creation failed (likely already exist): {e}')
+        print(f'Table creation failed: {e}')
 
 def insert_data():
     session = get_session()
@@ -110,4 +112,4 @@ def insert_data():
 
 if __name__ == '__main__':
     create_tables()
-    insert_data()
+    # insert_data()  # Commented out since data variables are not defined
