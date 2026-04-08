@@ -1,4 +1,5 @@
-import pyodbc
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
 connection_string = (
     r'Driver={SQL Server};'
@@ -7,10 +8,11 @@ connection_string = (
     r'Trusted_Connection=yes;'
 )
 
-try:
-    conn = pyodbc.connect(connection_string, timeout=5)
-    print('Database connection successful')
-except pyodbc.Error as error:
-    print('Database connection failed:')
-    print(error)
-    conn = None
+engine = create_engine(f'mssql+pyodbc:///?odbc_connect={connection_string}', echo=False)
+Session = sessionmaker(bind=engine)
+
+def get_session():
+    return Session()
+
+# For backward compatibility, keep conn as engine
+conn = engine
