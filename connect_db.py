@@ -7,3 +7,5 @@ conn = pyodbc.connect(
     'DATABASE=project_pg;'                
     'Trusted_Connection=yes;'        # Windows Authentication
 )
+
+

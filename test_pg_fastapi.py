@@ -1,10 +1,23 @@
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, Session
 from pg_fastapi import app, get_db, IdentifiersCreate
 from main import Identifiers, Base
-from connectdb import engine
 
+# SQLite in-memory engine — works without SQL Server or pyodbc
+TEST_DATABASE_URL = "sqlite:///./test_ci.db"
+test_engine = create_engine(TEST_DATABASE_URL, connect_args={"check_same_thread": False})
+TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
+
+def override_get_db():
+    db = TestingSessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+app.dependency_overrides[get_db] = override_get_db
 
 # Test client setup
 client = TestClient(app)
@@ -13,10 +26,10 @@ client = TestClient(app)
 @pytest.fixture(scope="function")
 def setup_and_teardown_db():
     """Create tables before tests and drop them after"""
-    Base.metadata.drop_all(engine)
-    Base.metadata.create_all(engine)
+    Base.metadata.drop_all(test_engine)
+    Base.metadata.create_all(test_engine)
     yield
-    Base.metadata.drop_all(engine)
+    Base.metadata.drop_all(test_engine)
 
 
 class TestRoot:

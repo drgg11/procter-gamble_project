@@ -1,3 +1,5 @@
+import fastapi as fa
+from pydantic import BaseModel
 from sqlalchemy import Column, String, Text, Integer, DECIMAL, ForeignKey
 from sqlalchemy.orm import declarative_base, relationship
 from connectdb import engine, get_session
@@ -64,6 +66,26 @@ class IdentifierCharacteristics(Base):
     master_name = Column(String(255), primary_key=True)
     characteristic_name = Column(String(255), primary_key=True)
     __table_args__ = {'schema': None}
+
+app = fa.FastAPI()
+
+class EfficiencyRequest(BaseModel):
+    speed: float
+    downtime: float
+    quality_rate: float
+    utilization_rate: float
+
+def calculate_efficiency(speed: float, downtime: float, quality_rate: float, utilization_rate: float) -> float:
+    return (speed * downtime * quality_rate * utilization_rate * 100) / 60
+
+@app.post("/calculate_efficiency")
+def calculate_efficiency_endpoint(data: EfficiencyRequest):
+    if data.quality_rate < 0 or data.quality_rate > 1 or data.utilization_rate < 0 or data.utilization_rate > 1:
+        raise fa.HTTPException(status_code=400, detail="Quality rate and utilization rate must be between 0 and 1")
+    if data.speed < 0 or data.downtime < 0:
+        raise fa.HTTPException(status_code=400, detail="Speed and downtime must be non-negative")
+    return {"efficiency": calculate_efficiency(data.speed, data.downtime, data.quality_rate, data.utilization_rate)}
+
 
 def create_tables():
     try:
