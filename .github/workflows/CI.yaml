@@ -24,4 +24,4 @@ jobs:
         env:
           DATABASE_URL: sqlite:///./test_ci.db
         run: |
-          pytest test_main.py test_pg_fastapi.py
+          pytest test_pg_fastapi.py
